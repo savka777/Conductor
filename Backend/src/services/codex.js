@@ -111,6 +111,9 @@ class CodexService extends EventEmitter {
                         try {
                             const event = JSON.parse(line);
                             this.handleCodexEvent(task.id, event);
+                            
+                            // Emit real-time thinking events
+                            this.emitCodexThinkingEvents(task.id, event);
                         } catch (e) {
                             // Not JSON, treat as regular log
                             this.addTaskLog(task.id, 'stdout', line);
@@ -221,6 +224,93 @@ class CodexService extends EventEmitter {
         });
 
         this.emit('taskLog', { taskId, type, message });
+    }
+
+    /**
+     * Emit real-time Codex thinking events
+     */
+    emitCodexThinkingEvents(taskId, codexEvent) {
+        if (!codexEvent.msg) return;
+
+        const msg = codexEvent.msg;
+        const timestamp = new Date();
+
+        switch (msg.type) {
+            case 'agent_reasoning':
+                this.emit('thinkingStep', {
+                    taskId,
+                    type: 'thinking',
+                    text: msg.text,
+                    timestamp
+                });
+                break;
+
+            case 'agent_reasoning_section_break':
+                this.emit('thinkingStep', {
+                    taskId,
+                    type: 'section_break',
+                    text: '--- New thinking section ---',
+                    timestamp
+                });
+                break;
+
+            case 'exec_command_begin':
+                this.emit('commandEvent', {
+                    taskId,
+                    type: 'command_start',
+                    command: msg.command,
+                    workdir: msg.cwd,
+                    timestamp
+                });
+                break;
+
+            case 'exec_command_output_delta':
+                // Decode base64 output
+                let output = '';
+                try {
+                    output = Buffer.from(msg.chunk, 'base64').toString('utf8');
+                } catch (e) {
+                    output = msg.chunk;
+                }
+                
+                this.emit('commandOutput', {
+                    taskId,
+                    type: 'command_output',
+                    output,
+                    stream: msg.stream,
+                    timestamp
+                });
+                break;
+
+            case 'exec_command_end':
+                this.emit('commandEvent', {
+                    taskId,
+                    type: 'command_complete',
+                    exitCode: msg.metadata?.exit_code,
+                    duration: msg.metadata?.duration_seconds,
+                    timestamp
+                });
+                break;
+
+            case 'token_count':
+                this.emit('tokenUpdate', {
+                    taskId,
+                    type: 'token_usage',
+                    tokenInfo: msg.info,
+                    rateLimits: msg.rate_limits,
+                    timestamp
+                });
+                break;
+
+            case 'agent_message':
+                this.emit('agentMessage', {
+                    taskId,
+                    type: 'agent_response',
+                    message: msg.message,
+                    timestamp
+                });
+                break;
+        }
     }
 
     /**

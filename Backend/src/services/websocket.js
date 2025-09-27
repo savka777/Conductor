@@ -105,6 +105,27 @@ class WebSocketService {
         codexService.on('taskLog', (data) => {
             this.broadcastTaskEvent('task_log', data);
         });
+
+        // Real-time Codex thinking events
+        codexService.on('thinkingStep', (data) => {
+            this.broadcastTaskEvent('thinking_step', data);
+        });
+
+        codexService.on('commandEvent', (data) => {
+            this.broadcastTaskEvent('command_event', data);
+        });
+
+        codexService.on('commandOutput', (data) => {
+            this.broadcastTaskEvent('command_output', data);
+        });
+
+        codexService.on('tokenUpdate', (data) => {
+            this.broadcastTaskEvent('token_update', data);
+        });
+
+        codexService.on('agentMessage', (data) => {
+            this.broadcastTaskEvent('agent_message', data);
+        });
     }
 
     /**
